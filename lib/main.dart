@@ -5,6 +5,7 @@ import 'features/reels_screen/presentation/cubit/reels_cubit.dart';
 import 'features/reels_screen/presentation/pages/reels_screen.dart';
 
 void main() {
+
   di.init();
   runApp(const MyApp());
 }
@@ -18,7 +19,7 @@ class MyApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       home: BlocProvider(
         create: (context) => ReelsCubit(getReelsUseCase: di.sl())..getReels(),
-        child: const VideoListPage(),
+        child: const ReelsScreen()
       ),
     );
   }

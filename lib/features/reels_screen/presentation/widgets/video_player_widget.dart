@@ -1,89 +1,41 @@
+import 'package:cached_video_player_plus/cached_video_player_plus.dart';
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
 
-class VideoPlayerWidget extends StatefulWidget {
-  final String videoUrl;
+class VideoPlayerWidget extends StatelessWidget {
+  final CachedVideoPlayerPlusController controller;
+  final VoidCallback togglePlayback;
+  final bool showButton;
 
-  const VideoPlayerWidget({super.key, required this.videoUrl});
-
-  @override
-  VideoPlayerWidgetState createState() => VideoPlayerWidgetState();
-}
-
-class VideoPlayerWidgetState extends State<VideoPlayerWidget> {
-  late VideoPlayerController _controller;
-  bool isPlaying = false;
-  bool showButton = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _controller = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl))
-      ..initialize().then((_) {
-        setState(() {
-          isPlaying = true;
-        });
-        _controller.play();
-      });
-  }
-
-  @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  void _togglePlayback() {
-    setState(() {
-      if (isPlaying) {
-        _controller.pause();
-      } else {
-        _controller.play();
-      }
-      isPlaying = !isPlaying;
-    });
-  }
-
-  void _showButton() {
-    setState(() {
-      showButton = true;
-    });
-    Future.delayed(const Duration(seconds: 2), () {
-      setState(() {
-        showButton = false;
-      });
-    });
-  }
+  const VideoPlayerWidget({
+    super.key,
+    required this.controller,
+    required this.togglePlayback,
+    required this.showButton,
+  });
 
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
-      onTap: () {
-        _togglePlayback();
-        _showButton();
-      },
+      onTap: togglePlayback,
       child: Stack(
         children: [
           Positioned.fill(
-            child: _controller.value.isInitialized
-                ? AspectRatio(
-                    aspectRatio: _controller.value.aspectRatio,
-                    child: VideoPlayer(_controller),
-                  )
-                : const Center(
-                    child: CircularProgressIndicator(
-                    color: Colors.white,
-                  )),
+            child: AspectRatio(
+              aspectRatio: controller.value.isInitialized
+                  ? controller.value.aspectRatio
+                  : 16 / 9,
+              child: CachedVideoPlayerPlus(controller),
+            ),
           ),
           if (showButton)
             Center(
               child: IconButton(
                 icon: Icon(
-                  isPlaying ? Icons.pause : Icons.play_arrow,
+                  controller.value.isPlaying ? Icons.pause : Icons.play_arrow,
                   color: Colors.white,
                   size: 64.0,
                 ),
-                onPressed: _togglePlayback,
+                onPressed: togglePlayback,
               ),
             ),
         ],

@@ -1,62 +1,139 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_bloc/flutter_bloc.dart';
-import '../cubit/reels_cubit.dart';
+import 'package:cached_video_player_plus/cached_video_player_plus.dart';
+import 'package:reels_app_spider_tech/features/reels_screen/presentation/cubit/reels_cubit.dart';
+import '../widgets/reels_appbar.dart';
 import '../widgets/video_player_widget.dart';
 
-class VideoListPage extends StatefulWidget {
-  const VideoListPage({super.key});
+class ReelsScreen extends StatefulWidget {
+  const ReelsScreen({super.key});
 
   @override
-  VideoListPageState createState() => VideoListPageState();
+  State<ReelsScreen> createState() => _ReelsScreenState();
 }
 
-class VideoListPageState extends State<VideoListPage> {
+class _ReelsScreenState extends State<ReelsScreen> {
+  final List<CachedVideoPlayerPlusController> controllers = [];
+  final PageController _pageController = PageController(initialPage: 0);
+  bool isLoading = true;
+  bool showButton = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController.addListener(_onPageChanged);
+  }
+
+  void _initializeControllers(List<String> videoUrls) {
+    for (String videoUrl in videoUrls) {
+      final controller = CachedVideoPlayerPlusController.networkUrl(
+        Uri.parse(videoUrl),
+        httpHeaders: {
+          'Connection': 'keep-alive',
+        },
+        invalidateCacheIfOlderThan: const Duration(minutes: 10),
+      );
+
+      controller.initialize().then((_) {
+        controller.setLooping(true);
+        controllers.add(controller);
+
+        if (controllers.length == 1) {
+          controller.play();
+          setState(() {
+            isLoading = false;
+          });
+        }
+
+        setState(() {});
+      });
+    }
+  }
+
+  void _togglePlayback(int index) {
+    final controller = controllers[index];
+    setState(() {
+      if (controller.value.isPlaying) {
+        controller.pause();
+      } else {
+        controller.play();
+      }
+    });
+  }
+
+  void _showButton() {
+    setState(() {
+      showButton = true;
+    });
+    Future.delayed(const Duration(seconds: 2), () {
+      setState(() {
+        showButton = false;
+      });
+    });
+  }
+
+  void _onPageChanged() {
+    for (int i = 0; i < controllers.length; i++) {
+      if (i == _pageController.page!.round()) {
+        controllers[i].play();
+      } else {
+        controllers[i].pause();
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    for (var controller in controllers) {
+      controller.dispose();
+    }
+    _pageController.dispose();
+    super.dispose();
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
       backgroundColor: Colors.transparent,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        title: const Text(
-          "Reels",
-          style: TextStyle(
-            color: Colors.white,
-          ),
-        ),
-        actions: const [
-          Padding(
-            padding: EdgeInsets.symmetric(horizontal: 12),
-            child: Icon(
-              Icons.camera_alt_outlined,
-              color: Colors.white,
-            ),
-          )
-        ],
-      ),
+      appBar: const ReelsAppbar(),
       body: BlocBuilder<ReelsCubit, ReelsState>(
         builder: (context, state) {
-          if (state is ReelsLoadedState) {
-            return PageView.builder(
-              scrollDirection: Axis.vertical,
-              itemCount: state.getReelsModel.data.length,
-              itemBuilder: (context, index) {
-                return VideoPlayerWidget(
-                    videoUrl: state.getReelsModel.data[index].video);
-              },
-            );
-          } else if (state is ReelsLoadingState) {
+          if (state is ReelsLoadingState) {
             return const Center(
               child: CircularProgressIndicator(
                 color: Colors.white,
               ),
             );
-          } else if (state is ReelsErrorState) {
-            return Center(
-              child: Text(state.errorMessage.toString()),
+          } else if (state is ReelsLoadedState) {
+            final videoUrls =
+                state.getReelsModel.data.map((reel) => reel.video).toList();
+            _initializeControllers(videoUrls);
+
+            return PageView.builder(
+              scrollDirection: Axis.vertical,
+              controller: _pageController,
+              itemCount: videoUrls.length,
+              itemBuilder: (context, index) {
+                if (controllers.length > index) {
+                  return VideoPlayerWidget(
+                    controller: controllers[index],
+                    togglePlayback: () {
+                      _togglePlayback(index);
+                      _showButton();
+                    },
+                    showButton: showButton,
+                  );
+                } else {
+                  return const SizedBox();
+                }
+              },
             );
+          } else if (state is ReelsErrorState) {
+            return Center(child: Text('Error: ${state.errorMessage}'));
+          } else {
+            return const Center(child: Text('Unexpected state'));
           }
-          return Container();
         },
       ),
     );
